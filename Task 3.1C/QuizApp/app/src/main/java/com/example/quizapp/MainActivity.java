@@ -1,0 +1,161 @@
+package com.example.quizapp;
+
+import android.content.Intent;
+import android.graphics.Color;
+import android.os.Bundle;
+import android.view.View;
+import android.widget.*;
+import androidx.appcompat.app.AppCompatActivity;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class MainActivity extends AppCompatActivity {
+
+    private TextView questionProgressText;
+
+    private TextView questionTextView;
+    private RadioGroup optionsGroup;
+    private RadioButton option1, option2, option3, option4;
+    private Button submitButton;
+    private ProgressBar progressBar;
+
+    private List<Question> questionList;
+    private int currentQuestionIndex = 0;
+    private int score = 0;
+    private boolean answered = false;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+
+        String username = getIntent().getStringExtra("USERNAME");
+        questionTextView = findViewById(R.id.questionTextView);
+        questionProgressText = findViewById(R.id.questionProgressText);
+        questionTextView.setText("Welcome " + username + "!");
+
+
+        questionTextView = findViewById(R.id.questionTextView);
+        optionsGroup = findViewById(R.id.optionsGroup);
+        option1 = findViewById(R.id.option1);
+        option2 = findViewById(R.id.option2);
+        option3 = findViewById(R.id.option3);
+        option4 = findViewById(R.id.option4);
+        submitButton = findViewById(R.id.submitButton);
+        progressBar = findViewById(R.id.progressBar);
+
+        questionList = getQuestions();
+        loadQuestion();
+
+        submitButton.setOnClickListener(v -> {
+            if (!answered) {
+                checkAnswer();
+            } else {
+                currentQuestionIndex++;
+                if (currentQuestionIndex < questionList.size()) {
+                    loadQuestion();
+                } else {
+                    showResult();
+                }
+            }
+        });
+    }
+
+    private void loadQuestion() {
+        resetOptions();
+
+        Question q = questionList.get(currentQuestionIndex);
+        questionTextView.setText(q.getQuestionText());
+
+        String[] opts = q.getOptions();
+        option1.setText(opts[0]);
+        option2.setText(opts[1]);
+        option3.setText(opts[2]);
+        option4.setText(opts[3]);
+
+        progressBar.setProgress((int) (((currentQuestionIndex + 1) / (float) questionList.size()) * 100));
+        submitButton.setText("Submit");
+        answered = false;
+
+        questionProgressText.setText("Question " + (currentQuestionIndex + 1) + " of " + questionList.size());
+    }
+
+    private void resetOptions() {
+        optionsGroup.clearCheck();
+        option1.setTextColor(Color.BLACK);
+        option2.setTextColor(Color.BLACK);
+        option3.setTextColor(Color.BLACK);
+        option4.setTextColor(Color.BLACK);
+    }
+
+    private void checkAnswer() {
+        int selectedId = optionsGroup.getCheckedRadioButtonId();
+
+        if (selectedId == -1) {
+            Toast.makeText(this, "Please select an answer", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        RadioButton selectedOption = findViewById(selectedId);
+        int selectedIndex = optionsGroup.indexOfChild(selectedOption);
+        int correctIndex = questionList.get(currentQuestionIndex).getCorrectAnswerIndex();
+
+        if (selectedIndex == correctIndex) {
+            selectedOption.setTextColor(Color.GREEN);
+            score++;
+        } else {
+            selectedOption.setTextColor(Color.RED);
+            RadioButton correctOption = (RadioButton) optionsGroup.getChildAt(correctIndex);
+            correctOption.setTextColor(Color.GREEN);
+        }
+
+        answered = true;
+        submitButton.setText("Next");
+    }
+
+    private void showResult() {
+        Intent intent = new Intent(MainActivity.this, ResultActivity.class);
+        intent.putExtra("SCORE", score);
+        intent.putExtra("TOTAL", questionList.size());
+
+        String username = getIntent().getStringExtra("USERNAME");
+        intent.putExtra("USERNAME", username);
+
+        startActivity(intent);
+        finish();
+    }
+
+    private List<Question> getQuestions() {
+        List<Question> questions = new ArrayList<>();
+
+        questions.add(new Question(
+                "What is the capital of France?",
+                new String[]{"Berlin", "Madrid", "Paris", "Rome"},
+                2
+        ));
+        questions.add(new Question(
+                "Who wrote 'Romeo and Juliet'?",
+                new String[]{"William Shakespeare", "Leo Tolstoy", "Charles Dickens", "Jane Austen"},
+                0
+        ));
+        questions.add(new Question(
+                "Which planet is known as the Red Planet?",
+                new String[]{"Earth", "Mars", "Jupiter", "Venus"},
+                1
+        ));
+
+        questions.add(new Question(
+                "What is the largest ocean on Earth?",
+                new String[]{"Atlantic", "Indian", "Arctic", "Pacific"},
+                3
+        ));
+        questions.add(new Question(
+                "Which language is primarily spoken in Brazil?",
+                new String[]{"Spanish", "Portuguese", "French", "English"},
+                1
+        ));
+
+        return questions;
+    }
+}
