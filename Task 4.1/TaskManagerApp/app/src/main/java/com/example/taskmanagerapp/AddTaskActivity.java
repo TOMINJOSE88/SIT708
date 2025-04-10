@@ -1,5 +1,6 @@
 package com.example.taskmanagerapp;
 
+import android.app.DatePickerDialog;
 import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
@@ -8,6 +9,9 @@ import android.widget.EditText;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+
+import java.util.Calendar;
+import java.util.Locale;
 
 public class AddTaskActivity extends AppCompatActivity {
 
@@ -29,7 +33,12 @@ public class AddTaskActivity extends AppCompatActivity {
 
         taskDatabase = TaskDatabase.getInstance(this);
 
-        // ✅ Check if we're editing an existing task
+        // 🗓️ Set up date picker only
+        editTextDueDate.setFocusable(false);
+        editTextDueDate.setClickable(true);
+        editTextDueDate.setOnClickListener(v -> showDatePicker());
+
+        // Check if editing
         Intent intent = getIntent();
         if (intent.hasExtra("task_id")) {
             taskId = intent.getIntExtra("task_id", -1);
@@ -40,6 +49,24 @@ public class AddTaskActivity extends AppCompatActivity {
         }
 
         buttonSave.setOnClickListener(v -> saveTask());
+    }
+
+    private void showDatePicker() {
+        Calendar calendar = Calendar.getInstance();
+        int year = calendar.get(Calendar.YEAR);
+        int month = calendar.get(Calendar.MONTH);
+        int day = calendar.get(Calendar.DAY_OF_MONTH);
+
+        DatePickerDialog datePickerDialog = new DatePickerDialog(
+                AddTaskActivity.this,
+                (view, selectedYear, selectedMonth, selectedDay) -> {
+                    String formattedDate = String.format(Locale.getDefault(),
+                            "%04d-%02d-%02d", selectedYear, selectedMonth + 1, selectedDay);
+                    editTextDueDate.setText(formattedDate);
+                },
+                year, month, day
+        );
+        datePickerDialog.show();
     }
 
     private void saveTask() {
@@ -53,7 +80,6 @@ public class AddTaskActivity extends AppCompatActivity {
         }
 
         if (taskId != -1) {
-            // ✅ Update existing task
             Task task = new Task(title, description, dueDate);
             task.setId(taskId);
             new Thread(() -> {
@@ -64,7 +90,6 @@ public class AddTaskActivity extends AppCompatActivity {
                 });
             }).start();
         } else {
-            // ✅ Add new task
             Task task = new Task(title, description, dueDate);
             new Thread(() -> {
                 taskDatabase.taskDao().insert(task);

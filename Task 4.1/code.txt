@@ -1,0 +1,362 @@
+MainActivity.java:
+package com.example.taskmanagerapp;
+
+import android.content.Intent;
+import android.os.Bundle;
+
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
+import java.util.List;
+
+public class MainActivity extends AppCompatActivity {
+
+    private TaskAdapter taskAdapter;
+    private TaskDatabase taskDatabase;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+
+        RecyclerView recyclerView = findViewById(R.id.recycler_view_tasks);
+        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+        recyclerView.setHasFixedSize(true);
+
+        taskAdapter = new TaskAdapter();
+        recyclerView.setAdapter(taskAdapter);
+
+        taskDatabase = TaskDatabase.getInstance(this);
+
+        findViewById(R.id.button_add_task).setOnClickListener(v -> {
+            startActivity(new Intent(MainActivity.this, AddTaskActivity.class));
+        });
+
+        taskAdapter.setOnItemLongClickListener(task -> {
+            new AlertDialog.Builder(MainActivity.this)
+                    .setTitle("Delete Task")
+                    .setMessage("Are you sure you want to delete this task?")
+                    .setPositiveButton("Yes", (dialog, which) -> {
+                        new Thread(() -> {
+                            taskDatabase.taskDao().delete(task);
+                            runOnUiThread(this::loadTasks);
+                        }).start();
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+        });
+
+        taskAdapter.setOnItemClickListener(task -> {
+            Intent intent = new Intent(MainActivity.this, AddTaskActivity.class);
+            intent.putExtra("task_id", task.getId());
+            intent.putExtra("title", task.getTitle());
+            intent.putExtra("description", task.getDescription());
+            intent.putExtra("due_date", task.getDueDate());
+            startActivity(intent);
+        });
+
+        loadTasks();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        loadTasks();
+    }
+
+    private void loadTasks() {
+        new Thread(() -> {
+            List<Task> tasks = taskDatabase.taskDao().getAllTasks();
+            runOnUiThread(() -> taskAdapter.setTasks(tasks));
+        }).start();
+    }
+}
+
+Task.java:
+package com.example.taskmanagerapp;
+
+import androidx.room.Entity;
+import androidx.room.PrimaryKey;
+
+@Entity(tableName = "task_table")
+public class Task {
+
+    @PrimaryKey(autoGenerate = true)
+    private int id;
+
+    private String title;
+    private String description;
+    private String dueDate;
+
+    public Task(String title, String description, String dueDate) {
+        this.title = title;
+        this.description = description;
+        this.dueDate = dueDate;
+    }
+
+    public void setId(int id) {
+        this.id = id;
+    }
+    public int getId() {
+        return id;
+    }
+    public String getTitle() {
+        return title;
+    }
+    public String getDescription() {
+        return description;
+    }
+    public String getDueDate() {
+        return dueDate;
+    }
+}
+
+
+AddTaskActivity.java:
+package com.example.taskmanagerapp;
+
+import android.app.DatePickerDialog;
+import android.content.Intent;
+import android.os.Bundle;
+import android.text.TextUtils;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.Toast;
+
+import androidx.appcompat.app.AppCompatActivity;
+
+import java.util.Calendar;
+import java.util.Locale;
+
+public class AddTaskActivity extends AppCompatActivity {
+
+    private EditText editTextTitle, editTextDescription, editTextDueDate;
+    private Button buttonSave;
+
+    private TaskDatabase taskDatabase;
+    private int taskId = -1; // ✅ used for editing check
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_add_task);
+
+        editTextTitle = findViewById(R.id.edit_text_title);
+        editTextDescription = findViewById(R.id.edit_text_description);
+        editTextDueDate = findViewById(R.id.edit_text_due_date);
+        buttonSave = findViewById(R.id.button_save);
+
+        taskDatabase = TaskDatabase.getInstance(this);
+
+        // 🗓️ Set up date picker only
+        editTextDueDate.setFocusable(false);
+        editTextDueDate.setClickable(true);
+        editTextDueDate.setOnClickListener(v -> showDatePicker());
+
+        // Check if editing
+        Intent intent = getIntent();
+        if (intent.hasExtra("task_id")) {
+            taskId = intent.getIntExtra("task_id", -1);
+            editTextTitle.setText(intent.getStringExtra("title"));
+            editTextDescription.setText(intent.getStringExtra("description"));
+            editTextDueDate.setText(intent.getStringExtra("due_date"));
+            buttonSave.setText("Update Task");
+        }
+
+        buttonSave.setOnClickListener(v -> saveTask());
+    }
+
+    private void showDatePicker() {
+        Calendar calendar = Calendar.getInstance();
+        int year = calendar.get(Calendar.YEAR);
+        int month = calendar.get(Calendar.MONTH);
+        int day = calendar.get(Calendar.DAY_OF_MONTH);
+
+        DatePickerDialog datePickerDialog = new DatePickerDialog(
+                AddTaskActivity.this,
+                (view, selectedYear, selectedMonth, selectedDay) -> {
+                    String formattedDate = String.format(Locale.getDefault(),
+                            "%04d-%02d-%02d", selectedYear, selectedMonth + 1, selectedDay);
+                    editTextDueDate.setText(formattedDate);
+                },
+                year, month, day
+        );
+        datePickerDialog.show();
+    }
+
+    private void saveTask() {
+        String title = editTextTitle.getText().toString().trim();
+        String description = editTextDescription.getText().toString().trim();
+        String dueDate = editTextDueDate.getText().toString().trim();
+
+        if (TextUtils.isEmpty(title) || TextUtils.isEmpty(dueDate)) {
+            Toast.makeText(this, "Title and Due Date are required", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (taskId != -1) {
+            Task task = new Task(title, description, dueDate);
+            task.setId(taskId);
+            new Thread(() -> {
+                taskDatabase.taskDao().update(task);
+                runOnUiThread(() -> {
+                    Toast.makeText(this, "Task Updated", Toast.LENGTH_SHORT).show();
+                    finish();
+                });
+            }).start();
+        } else {
+            Task task = new Task(title, description, dueDate);
+            new Thread(() -> {
+                taskDatabase.taskDao().insert(task);
+                runOnUiThread(() -> {
+                    Toast.makeText(this, "Task Saved", Toast.LENGTH_SHORT).show();
+                    finish();
+                });
+            }).start();
+        }
+    }
+}
+
+TaskAdapter.java:
+package com.example.taskmanagerapp;
+
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.TextView;
+
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.RecyclerView;
+
+import java.util.List;
+
+public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder> {
+
+    private List<Task> taskList;
+    private OnItemLongClickListener longClickListener;
+    private OnItemClickListener clickListener;
+
+    public interface OnItemLongClickListener {
+        void onItemLongClick(Task task);
+    }
+
+    public interface OnItemClickListener {
+        void onItemClick(Task task);
+    }
+
+    public void setOnItemLongClickListener(OnItemLongClickListener listener) {
+        this.longClickListener = listener;
+    }
+
+    public void setOnItemClickListener(OnItemClickListener listener) {
+        this.clickListener = listener;
+    }
+
+    public void setTasks(List<Task> tasks) {
+        this.taskList = tasks;
+        notifyDataSetChanged();
+    }
+
+    @NonNull
+    @Override
+    public TaskViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        View itemView = LayoutInflater.from(parent.getContext())
+                .inflate(R.layout.task_item, parent, false);
+        return new TaskViewHolder(itemView);
+    }
+
+    @Override
+    public void onBindViewHolder(@NonNull TaskViewHolder holder, int position) {
+        Task currentTask = taskList.get(position);
+        holder.textViewTitle.setText(currentTask.getTitle());
+        holder.textViewDueDate.setText(currentTask.getDueDate());
+        holder.textViewDescription.setText(currentTask.getDescription());
+
+        holder.itemView.setOnLongClickListener(v -> {
+            if (longClickListener != null) {
+                longClickListener.onItemLongClick(currentTask);
+            }
+            return true;
+        });
+
+        holder.itemView.setOnClickListener(v -> {
+            if (clickListener != null) {
+                clickListener.onItemClick(currentTask);
+            }
+        });
+    }
+
+    @Override
+    public int getItemCount() {
+        return (taskList != null) ? taskList.size() : 0;
+    }
+
+    public static class TaskViewHolder extends RecyclerView.ViewHolder {
+        private TextView textViewTitle;
+        private TextView textViewDueDate;
+        private TextView textViewDescription;
+
+        public TaskViewHolder(@NonNull View itemView) {
+            super(itemView);
+            textViewTitle = itemView.findViewById(R.id.text_view_title);
+            textViewDueDate = itemView.findViewById(R.id.text_view_due_date);
+            textViewDescription = itemView.findViewById(R.id.text_view_description);
+        }
+    }
+}
+
+
+TaskDao.java:
+package com.example.taskmanagerapp;
+
+import androidx.room.Dao;
+import androidx.room.Delete;
+import androidx.room.Insert;
+import androidx.room.Query;
+import androidx.room.Update;
+
+import java.util.List;
+
+@Dao
+public interface TaskDao {
+    @Insert
+    void insert(Task task);
+
+    @Update
+    void update(Task task);
+
+    @Delete
+    void delete(Task task);
+
+
+    @Query("SELECT * FROM task_table ORDER BY dueDate ASC")
+    List<Task> getAllTasks();
+}
+
+TaskDatabase.java:
+package com.example.taskmanagerapp;
+
+import android.content.Context;
+import androidx.room.Database;
+import androidx.room.Room;
+import androidx.room.RoomDatabase;
+
+@Database(entities = {Task.class}, version = 1)
+public abstract class TaskDatabase extends RoomDatabase {
+
+    private static TaskDatabase instance;
+
+    public abstract TaskDao taskDao();
+
+    public static synchronized TaskDatabase getInstance(Context context) {
+        if (instance == null) {
+            instance = Room.databaseBuilder(context.getApplicationContext(),
+                            TaskDatabase.class, "task_database")
+                    .fallbackToDestructiveMigration()
+                    .build();
+        }
+        return instance;
+    }
+}
