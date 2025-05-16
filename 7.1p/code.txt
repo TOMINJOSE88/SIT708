@@ -1,0 +1,360 @@
+MainActivity.java:
+package com.example.lostfoundapp;
+
+import android.content.Intent;
+import android.os.Bundle;
+import android.view.View;
+import android.widget.Button;
+import androidx.appcompat.app.AppCompatActivity;
+
+public class MainActivity extends AppCompatActivity {
+
+    Button btnCreateAdvert, btnShowItems;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+
+        btnCreateAdvert = findViewById(R.id.btnCreateAdvert);
+        btnShowItems = findViewById(R.id.btnShowItems);
+
+        btnCreateAdvert.setOnClickListener(v -> {
+            Intent intent = new Intent(MainActivity.this, AddItemActivity.class);
+            startActivity(intent);
+        });
+
+        btnShowItems.setOnClickListener(v -> {
+            Intent intent = new Intent(MainActivity.this, ItemListActivity.class);
+            startActivity(intent);
+        });
+    }
+}
+
+
+DatabaseHelper.java:
+package com.example.lostfoundapp;
+
+import android.content.ContentValues;
+import android.content.Context;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteOpenHelper;
+
+public class DatabaseHelper extends SQLiteOpenHelper {
+
+    private static final String DATABASE_NAME = "LostFound.db";
+    private static final int DATABASE_VERSION = 1;
+    private static final String TABLE_NAME = "items";
+
+    private static final String COL_ID = "id";
+    private static final String COL_TYPE = "type";
+    private static final String COL_NAME = "name";
+    private static final String COL_PHONE = "phone";
+    private static final String COL_DESCRIPTION = "description";
+    private static final String COL_DATE = "date";
+    private static final String COL_LOCATION = "location";
+
+    public DatabaseHelper(Context context) {
+        super(context, DATABASE_NAME, null, DATABASE_VERSION);
+    }
+
+    @Override
+    public void onCreate(SQLiteDatabase db) {
+        String createTable = "CREATE TABLE " + TABLE_NAME + " (" +
+                COL_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                COL_TYPE + " TEXT, " +
+                COL_NAME + " TEXT, " +
+                COL_PHONE + " TEXT, " +
+                COL_DESCRIPTION + " TEXT, " +
+                COL_DATE + " TEXT, " +
+                COL_LOCATION + " TEXT)";
+        db.execSQL(createTable);
+    }
+
+    @Override
+    public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+        db.execSQL("DROP TABLE IF EXISTS " + TABLE_NAME);
+        onCreate(db);
+    }
+
+    public boolean insertItem(String type, String name, String phone, String description, String date, String location) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put(COL_TYPE, type);
+        values.put(COL_NAME, name);
+        values.put(COL_PHONE, phone);
+        values.put(COL_DESCRIPTION, description);
+        values.put(COL_DATE, date);
+        values.put(COL_LOCATION, location);
+
+        long result = db.insert(TABLE_NAME, null, values);
+        return result != -1; // if insert fails, it returns -1
+    }
+
+    public Cursor getAllItems() {
+        SQLiteDatabase db = this.getReadableDatabase();
+        return db.rawQuery("SELECT * FROM " + TABLE_NAME + " ORDER BY id DESC", null);
+    }
+
+    public boolean deleteItem(int id) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        int result = db.delete(TABLE_NAME, COL_ID + "=?", new String[]{String.valueOf(id)});
+        return result > 0;
+    }
+}
+
+AddItemActivity.java:
+package com.example.lostfoundapp;
+
+import android.os.Bundle;
+import android.view.View;
+import android.widget.*;
+import androidx.appcompat.app.AppCompatActivity;
+
+public class AddItemActivity extends AppCompatActivity {
+
+    private EditText editName, editPhone, editDescription, editDate, editLocation;
+    private RadioGroup radioGroupType;
+    private Button btnSave;
+    private DatabaseHelper dbHelper;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_add_item);
+
+        // Initialize UI elements
+        radioGroupType = findViewById(R.id.radioGroupType);
+        editName = findViewById(R.id.editName);
+        editPhone = findViewById(R.id.editPhone);
+        editDescription = findViewById(R.id.editDescription);
+        editDate = findViewById(R.id.editDate);
+        editLocation = findViewById(R.id.editLocation);
+        btnSave = findViewById(R.id.btnSave);
+
+        // Initialize DB helper
+        dbHelper = new DatabaseHelper(this);
+
+        // Save button listener
+        btnSave.setOnClickListener(v -> saveAdvert());
+    }
+
+    private void saveAdvert() {
+        String type = ((RadioButton) findViewById(radioGroupType.getCheckedRadioButtonId())).getText().toString();
+        String name = editName.getText().toString().trim();
+        String phone = editPhone.getText().toString().trim();
+        String description = editDescription.getText().toString().trim();
+        String date = editDate.getText().toString().trim();
+        String location = editLocation.getText().toString().trim();
+
+        if (name.isEmpty() || phone.isEmpty() || description.isEmpty() || date.isEmpty() || location.isEmpty()) {
+            Toast.makeText(this, "Please fill in all fields", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        boolean inserted = dbHelper.insertItem(type, name, phone, description, date, location);
+
+        if (inserted) {
+            Toast.makeText(this, "Advert saved successfully", Toast.LENGTH_SHORT).show();
+            finish(); // Go back to main screen
+        } else {
+            Toast.makeText(this, "Failed to save advert", Toast.LENGTH_SHORT).show();
+        }
+    }
+}
+
+item.java:
+package com.example.lostfoundapp;
+
+import java.io.Serializable;
+
+public class Item implements Serializable {
+    public int id;
+    public String type, name, phone, description, date, location;
+
+    public Item(int id, String type, String name, String phone, String description, String date, String location) {
+        this.id = id;
+        this.type = type;
+        this.name = name;
+        this.phone = phone;
+        this.description = description;
+        this.date = date;
+        this.location = location;
+    }
+}
+
+ItemAdapter.java:
+package com.example.lostfoundapp;
+
+import android.content.Context;
+import android.content.Intent;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.TextView;
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.RecyclerView;
+
+import java.util.ArrayList;
+
+public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemViewHolder> {
+
+    Context context;
+    ArrayList<Item> itemList;
+
+    public ItemAdapter(Context context, ArrayList<Item> itemList) {
+        this.context = context;
+        this.itemList = itemList;
+    }
+
+    @NonNull
+    @Override
+    public ItemViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        View view = LayoutInflater.from(context).inflate(R.layout.item_row, parent, false);
+        return new ItemViewHolder(view);
+    }
+
+    @Override
+    public void onBindViewHolder(@NonNull ItemViewHolder holder, int position) {
+        Item item = itemList.get(position);
+        holder.txtTitle.setText(item.type + ": " + item.description);
+
+        holder.itemView.setOnClickListener(v -> {
+            Intent intent = new Intent(context, ItemDetailActivity.class);
+            intent.putExtra("item", item); // Serializable
+            context.startActivity(intent);
+        });
+    }
+
+    @Override
+    public int getItemCount() {
+        return itemList.size();
+    }
+
+    public static class ItemViewHolder extends RecyclerView.ViewHolder {
+        TextView txtTitle;
+
+        public ItemViewHolder(@NonNull View itemView) {
+            super(itemView);
+            txtTitle = itemView.findViewById(R.id.txtTitle);
+        }
+    }
+}
+
+ItemDetailActivity.java:
+package com.example.lostfoundapp;
+
+import android.content.Intent;
+import android.os.Bundle;
+import android.widget.Button;
+import android.widget.TextView;
+import android.widget.Toast;
+import androidx.appcompat.app.AppCompatActivity;
+
+public class ItemDetailActivity extends AppCompatActivity {
+
+    TextView txtDescription, txtDate, txtLocation;
+    Button btnDelete;
+    DatabaseHelper dbHelper;
+    int itemId = -1;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_item_detail);
+
+        txtDescription = findViewById(R.id.txtDescription);
+        txtDate = findViewById(R.id.txtDate);
+        txtLocation = findViewById(R.id.txtLocation);
+        btnDelete = findViewById(R.id.btnDelete);
+        dbHelper = new DatabaseHelper(this);
+
+        Intent intent = getIntent();
+        if (intent != null && intent.hasExtra("item")) {
+            Item item = (Item) intent.getSerializableExtra("item");
+            itemId = item.id;
+            txtDescription.setText(item.type + " " + item.description);
+            txtDate.setText(item.date);
+            txtLocation.setText("At " + item.location);
+        }
+
+        btnDelete.setOnClickListener(v -> {
+            if (itemId != -1) {
+                boolean success = dbHelper.deleteItem(itemId);
+                if (success) {
+                    Toast.makeText(this, "Item removed", Toast.LENGTH_SHORT).show();
+                    finish();
+                } else {
+                    Toast.makeText(this, "Failed to remove", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+    }
+}
+
+
+ItemListActivity.java:
+package com.example.lostfoundapp;
+
+import android.database.Cursor;
+import android.os.Bundle;
+import android.widget.Toast;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
+import java.util.ArrayList;
+
+public class ItemListActivity extends AppCompatActivity {
+
+    RecyclerView recyclerView;
+    ItemAdapter adapter;
+    DatabaseHelper dbHelper;
+    ArrayList<Item> itemList;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_item_list);
+
+        recyclerView = findViewById(R.id.recyclerView);
+        dbHelper = new DatabaseHelper(this);
+        itemList = new ArrayList<>();
+        adapter = new ItemAdapter(this, itemList);
+
+        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+        recyclerView.setAdapter(adapter);
+
+        loadItems(); // Initial load
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        loadItems(); // Refresh on return
+    }
+
+    private void loadItems() {
+        itemList.clear(); // Clear previous data
+
+        Cursor cursor = dbHelper.getAllItems();
+        if (cursor.moveToFirst()) {
+            do {
+                int id = cursor.getInt(0);
+                String type = cursor.getString(1);
+                String name = cursor.getString(2);
+                String phone = cursor.getString(3);
+                String description = cursor.getString(4);
+                String date = cursor.getString(5);
+                String location = cursor.getString(6);
+
+                itemList.add(new Item(id, type, name, phone, description, date, location));
+            } while (cursor.moveToNext());
+        } else {
+            Toast.makeText(this, "No items found", Toast.LENGTH_SHORT).show();
+        }
+
+        adapter.notifyDataSetChanged(); // Refresh RecyclerView
+    }
+}
