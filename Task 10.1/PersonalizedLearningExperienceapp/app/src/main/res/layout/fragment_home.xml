@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/design_default_color_secondary"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+
+
+        <!-- Greeting -->
+        <TextView
+            android:id="@+id/greetingText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Hello, Your Name"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:textColor="@android:color/black"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Task Notification -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="#00FFF7"
+            android:padding="10dp"
+            android:orientation="horizontal"
+            android:layout_marginBottom="16dp">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@android:drawable/ic_dialog_info"
+                android:contentDescription="notification icon"
+                app:tint="@android:color/black" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="You have 1 task due"
+                android:layout_marginStart="8dp"
+                android:textStyle="bold"
+                android:textColor="@android:color/black" />
+        </LinearLayout>
+
+        <!-- Task Card -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:background="#2076FF"
+            android:layout_marginBottom="24dp"
+            android:layout_marginTop="4dp"
+            android:elevation="4dp"
+            android:backgroundTintMode="src_atop"
+            android:radius="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="✨ Generated Task 1"
+                android:textColor="@android:color/white"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Small Description for the generated Task    "
+                android:textColor="@android:color/white"
+                android:layout_marginTop="4dp" />
+
+            <Button
+                android:id="@+id/btnGenerateTaskArrow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="➜"
+                android:layout_gravity="end"
+                android:layout_marginTop="8dp"
+                android:backgroundTint="#00FF00"
+                android:textColor="@android:color/black" />
+        </LinearLayout>
+
+        <!-- Action Buttons -->
+        <Button
+            android:id="@+id/btnSetInterest"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Set Interests"
+            android:layout_marginBottom="12dp"
+            android:backgroundTint="#6200EE"
+            android:textColor="@android:color/white" />
+
+        <TextView
+            android:id="@+id/tvMyInterests"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/tv_box_background"
+            android:padding="12dp"
+            android:text="Your Interests: "
+            android:textColor="@android:color/black"
+            android:layout_marginBottom="16dp"
+            android:textStyle="italic"
+            android:textSize="16sp" />
+
+
+        <Button
+            android:id="@+id/btnProfile"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="View Profile"
+            android:layout_marginBottom="12dp"
+            android:backgroundTint="#03A9F4"
+            android:textColor="@android:color/white" />
+
+        <!-- History Button -->
+        <Button
+            android:id="@+id/btnHistory"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Quiz History"
+            android:layout_marginBottom="12dp"
+            android:backgroundTint="#4CAF50"
+            android:textColor="@android:color/white" />
+
+        <!-- Upgrade Account Button -->
+        <Button
+            android:id="@+id/btnUpgrade"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Upgrade Account"
+            android:layout_marginBottom="24dp"
+            android:backgroundTint="#FFC107"
+            android:textColor="@android:color/black" />
+
+
+
+        <Button
+            android:id="@+id/btnLogout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Logout"
+            android:backgroundTint="#FF4444"
+            android:textColor="@android:color/white" />
+
+    </LinearLayout>
+</ScrollView>
