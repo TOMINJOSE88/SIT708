@@ -1,0 +1,1130 @@
+mainactivity.java:
+package com.example.personalizedlearningexperienceapp;
+
+import android.os.Bundle;
+import androidx.appcompat.app.AppCompatActivity;
+
+public class MainActivity extends AppCompatActivity {
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+
+        // Load LoginFragment by default
+        if (savedInstanceState == null) {
+            getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.fragment_container, new LoginFragment())
+                    .commit();
+        }
+    }
+}
+
+HomeFragment.java:
+package com.example.personalizedlearningexperienceapp;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.os.Bundle;
+import android.view.*;
+import android.widget.*;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
+import java.util.Random;
+
+
+import java.util.List;
+
+public class HomeFragment extends Fragment {
+
+    TextView greetingText, tvMyInterests;
+    Button btnSetInterest, btnLogout;
+
+    public HomeFragment() {}
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        View view = inflater.inflate(R.layout.fragment_home, container, false);
+
+        greetingText = view.findViewById(R.id.greetingText);
+        tvMyInterests = view.findViewById(R.id.tvMyInterests);
+        btnSetInterest = view.findViewById(R.id.btnSetInterest);
+        btnLogout = view.findViewById(R.id.btnLogout);
+        Button btnGenerateTaskArrow = view.findViewById(R.id.btnGenerateTaskArrow);
+
+        greetingText.setText("Hello, Student!");
+
+        SharedPreferences sharedPreferences = requireActivity().getSharedPreferences("UserPrefs", Context.MODE_PRIVATE);
+        String currentUsername = sharedPreferences.getString("username", null);
+
+        UserDatabaseHelper dbHelper = new UserDatabaseHelper(getContext());
+
+        if (currentUsername != null) {
+            List<String> interests = dbHelper.getUserInterests(currentUsername);
+            if (!interests.isEmpty()) {
+                StringBuilder sb = new StringBuilder("My Interests: ");
+                for (String interest : interests) {
+                    sb.append(interest).append(", ");
+                }
+                sb.setLength(sb.length() - 2); // remove trailing comma
+                tvMyInterests.setText(sb.toString());
+            } else {
+                tvMyInterests.setText("My Interests: None selected yet");
+            }
+        } else {
+            tvMyInterests.setText("My Interests: [User not found]");
+        }
+
+        btnGenerateTaskArrow.setOnClickListener(v -> {
+            SharedPreferences prefs = requireActivity().getSharedPreferences("UserPrefs", Context.MODE_PRIVATE);
+            String username = prefs.getString("username", null);
+
+            if (username != null) {
+                List<String> interests = dbHelper.getUserInterests(username);  // ✅ reuse existing dbHelper
+
+                if (!interests.isEmpty()) {
+                    String selectedTopic = interests.get(new Random().nextInt(interests.size()));
+
+                    // Pass the topic to QuizFragment
+                    Bundle bundle = new Bundle();
+                    bundle.putString("topic", selectedTopic);
+
+                    QuizFragment quizFragment = new QuizFragment();
+                    quizFragment.setArguments(bundle);
+
+                    getParentFragmentManager()
+                            .beginTransaction()
+                            .replace(R.id.fragment_container, quizFragment)
+                            .addToBackStack(null)
+                            .commit();
+                } else {
+                    Toast.makeText(getContext(), "No interests found!", Toast.LENGTH_SHORT).show();
+                }
+            } else {
+                Toast.makeText(getContext(), "User not logged in", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+
+        btnSetInterest.setOnClickListener(v -> {
+            getParentFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.fragment_container, new InterestFragment())
+                    .addToBackStack(null)
+                    .commit();
+        });
+
+        btnLogout.setOnClickListener(v -> {
+            getParentFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.fragment_container, new LoginFragment())
+                    .commit();
+        });
+
+        return view;
+    }
+}
+
+
+interestfragment.java:
+package com.example.personalizedlearningexperienceapp;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.graphics.Color;
+import android.os.Bundle;
+import android.view.*;
+import android.widget.*;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
+import androidx.fragment.app.Fragment;
+
+import java.util.HashSet;
+import java.util.Set;
+
+public class InterestFragment extends Fragment {
+
+    String[] topics = {
+            "Algorithms", "Data Structures", "Web Development", "Testing",
+            "Cyber Security", "AI", "Machine Learning", "Cloud",
+            "Databases", "DevOps"
+    };
+
+    Set<String> selectedInterests = new HashSet<>();
+    GridLayout gridLayout;
+    Button btnNext;
+
+    public InterestFragment() {}
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        View view = inflater.inflate(R.layout.fragment_interest, container, false);
+
+        gridLayout = view.findViewById(R.id.gridLayoutInterests);
+        btnNext = view.findViewById(R.id.btnNext);
+
+        for (String topic : topics) {
+            ToggleButton button = new ToggleButton(getContext());
+            button.setTextOff(topic);
+            button.setTextOn(topic);
+            button.setText(topic);
+            button.setAllCaps(false);
+            button.setTextColor(Color.BLACK);
+            button.setBackground(ContextCompat.getDrawable(getContext(), R.drawable.interest_selector));
+            button.setPadding(24, 12, 24, 12);
+
+            GridLayout.LayoutParams params = new GridLayout.LayoutParams();
+            params.setMargins(12, 12, 12, 12);
+            params.width = GridLayout.LayoutParams.WRAP_CONTENT;
+            params.height = GridLayout.LayoutParams.WRAP_CONTENT;
+            button.setLayoutParams(params);
+
+            button.setOnCheckedChangeListener((compoundButton, isChecked) -> {
+                if (isChecked) {
+                    if (selectedInterests.size() < 10) {
+                        selectedInterests.add(topic);
+                    } else {
+                        compoundButton.setChecked(false);
+                        Toast.makeText(getContext(), "Max 10 topics only", Toast.LENGTH_SHORT).show();
+                    }
+                } else {
+                    selectedInterests.remove(topic);
+                }
+            });
+
+            gridLayout.addView(button);
+        }
+
+        btnNext.setOnClickListener(v -> {
+            if (selectedInterests.isEmpty()) {
+                Toast.makeText(getContext(), "Please select at least one topic", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            // ✅ Save interests to DB using actual logged-in username
+            SharedPreferences sharedPreferences = requireActivity().getSharedPreferences("UserPrefs", Context.MODE_PRIVATE);
+            String username = sharedPreferences.getString("username", null);
+
+            if (username != null) {
+                UserDatabaseHelper dbHelper = new UserDatabaseHelper(getContext());
+                dbHelper.saveUserInterests(username, selectedInterests);
+
+                Toast.makeText(getContext(), "Interests saved!", Toast.LENGTH_SHORT).show();
+
+                getParentFragmentManager()
+                        .beginTransaction()
+                        .replace(R.id.fragment_container, new HomeFragment())
+                        .addToBackStack(null)
+                        .commit();
+            } else {
+                Toast.makeText(getContext(), "Error: User not found", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        return view;
+    }
+}
+
+
+loginfragment.java:
+package com.example.personalizedlearningexperienceapp;
+
+import android.os.Bundle;
+import android.text.TextUtils;
+import android.view.*;
+import android.widget.*;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
+import android.content.SharedPreferences;
+import android.content.Context;
+
+
+public class LoginFragment extends Fragment {
+
+    EditText usernameInput, passwordInput;
+    Button loginButton;
+    TextView goToSignupText;
+    UserDatabaseHelper dbHelper;
+
+    public LoginFragment() {}
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        View view = inflater.inflate(R.layout.fragment_login, container, false);
+
+        usernameInput = view.findViewById(R.id.loginUsernameInput);
+        passwordInput = view.findViewById(R.id.loginPasswordInput);
+        loginButton = view.findViewById(R.id.loginButton);
+        goToSignupText = view.findViewById(R.id.goToSignupText);
+        dbHelper = new UserDatabaseHelper(getContext());
+
+        loginButton.setOnClickListener(v -> {
+            String username = usernameInput.getText().toString().trim();
+            String password = passwordInput.getText().toString().trim();
+
+            if (TextUtils.isEmpty(username) || TextUtils.isEmpty(password)) {
+                Toast.makeText(getContext(), "All fields are required", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            if (dbHelper.checkUser(username, password)) {
+                SharedPreferences sharedPreferences = requireActivity().getSharedPreferences("UserPrefs", Context.MODE_PRIVATE);
+                SharedPreferences.Editor editor = sharedPreferences.edit();
+                editor.putString("username", username);
+                editor.apply();
+                Toast.makeText(getContext(), "Login Successful", Toast.LENGTH_SHORT).show();
+                getParentFragmentManager()
+                        .beginTransaction()
+                        .replace(R.id.fragment_container, new HomeFragment())
+                        .addToBackStack(null)
+                        .commit();
+            } else {
+                Toast.makeText(getContext(), "Invalid username or password", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        goToSignupText.setOnClickListener(v -> {
+            // Switch to SignupFragment
+            getParentFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.fragment_container, new SignupFragment())
+                    .commit();
+        });
+
+        return view;
+    }
+}
+
+
+quizadapter.java:
+package com.example.personalizedlearningexperienceapp;
+
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
+import android.widget.TextView;
+
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.RecyclerView;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class QuizAdapter extends RecyclerView.Adapter<QuizAdapter.QuizViewHolder> {
+
+    private List<QuizQuestion> quizList;
+    private int[] selectedAnswers;
+
+    public QuizAdapter(List<QuizQuestion> quizList) {
+        this.quizList = quizList != null ? quizList : new ArrayList<>();
+        this.selectedAnswers = new int[this.quizList.size()];
+        for (int i = 0; i < selectedAnswers.length; i++) {
+            selectedAnswers[i] = -1;
+        }
+    }
+
+    // ✅ Update data method
+    public void updateData(List<QuizQuestion> newList) {
+        this.quizList = newList != null ? newList : new ArrayList<>();
+        this.selectedAnswers = new int[this.quizList.size()];
+        for (int i = 0; i < selectedAnswers.length; i++) {
+            selectedAnswers[i] = -1;
+        }
+        notifyDataSetChanged();
+    }
+
+    public int[] getSelectedAnswers() {
+        return selectedAnswers;
+    }
+
+    public List<QuizQuestion> getQuizList() {
+        return quizList;
+    }
+
+    @NonNull
+    @Override
+    public QuizViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.quiz_card, parent, false);
+        return new QuizViewHolder(view);
+    }
+
+    @Override
+    public void onBindViewHolder(@NonNull QuizViewHolder holder, int position) {
+        QuizQuestion question = quizList.get(position);
+        holder.questionText.setText(question.getQuestion());
+        holder.optionsGroup.removeAllViews();
+
+        for (int i = 0; i < question.getOptions().size(); i++) {
+            RadioButton radioButton = new RadioButton(holder.itemView.getContext());
+            radioButton.setText(question.getOptions().get(i));
+            int index = i;
+            radioButton.setOnClickListener(v -> selectedAnswers[position] = index);
+            holder.optionsGroup.addView(radioButton);
+        }
+    }
+
+    @Override
+    public int getItemCount() {
+        return quizList.size();
+    }
+
+    static class QuizViewHolder extends RecyclerView.ViewHolder {
+        TextView questionText;
+        RadioGroup optionsGroup;
+
+        public QuizViewHolder(@NonNull View itemView) {
+            super(itemView);
+            questionText = itemView.findViewById(R.id.question_text);
+            optionsGroup = itemView.findViewById(R.id.options_group);
+        }
+    }
+}
+
+quizapiclient.java:
+package com.example.personalizedlearningexperienceapp;
+
+import retrofit2.Retrofit;
+import retrofit2.converter.gson.GsonConverterFactory;
+
+public class QuizApiClient {
+
+    private static final String BASE_URL = "http://10.0.2.2:5000/";
+    private static Retrofit retrofit;
+
+    public static Retrofit getClient() {
+        if (retrofit == null) {
+            retrofit = new Retrofit.Builder()
+                    .baseUrl(BASE_URL)
+                    .addConverterFactory(GsonConverterFactory.create())
+                    .build();
+        }
+        return retrofit;
+    }
+}
+quizapiservice.java:
+package com.example.personalizedlearningexperienceapp;
+
+import retrofit2.Call;
+import retrofit2.http.GET;
+import retrofit2.http.Query;
+import java.util.List;
+
+
+public interface QuizApiService {
+    @GET("getQuiz")
+    Call<QuizResponse> getQuiz(@Query("topic") String topic);
+}
+
+Resultfragment.java:
+package com.example.personalizedlearningexperienceapp;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.os.Bundle;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
+
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.TextView;
+
+public class ResultFragment extends Fragment {
+
+    private TextView tvResultText;
+    private Button btnBackToHome, btnLogout;
+
+    public ResultFragment() {
+        // Required empty public constructor
+    }
+
+    @Override
+    public View onCreateView(LayoutInflater inflater, ViewGroup container,
+                             Bundle savedInstanceState) {
+        // Inflate the layout for this fragment
+        return inflater.inflate(R.layout.fragment_result, container, false);
+    }
+
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+
+        tvResultText = view.findViewById(R.id.tvResultText);
+        btnBackToHome = view.findViewById(R.id.btnBackToHome);
+        btnLogout = view.findViewById(R.id.btnLogout);
+
+        Bundle args = getArguments();
+        if (args != null) {
+            int score = args.getInt("score", 0);
+            int total = args.getInt("total", 0);
+            tvResultText.setText("Your Score: " + score + " out of " + total);
+        }
+
+        btnBackToHome.setOnClickListener(v -> {
+            requireActivity().getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.fragment_container, new HomeFragment())
+                    .commit();
+        });
+
+        btnLogout.setOnClickListener(v -> {
+            SharedPreferences prefs = requireContext().getSharedPreferences("UserPrefs", Context.MODE_PRIVATE);
+            prefs.edit().clear().apply();
+
+            requireActivity().getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.fragment_container, new LoginFragment())
+                    .commit();
+        });
+    }
+}
+
+userdatabsehelper.java:
+package com.example.personalizedlearningexperienceapp;
+
+import android.content.ContentValues;
+import android.content.Context;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteOpenHelper;
+import java.util.Set;
+import java.util.List;
+import java.util.ArrayList;
+
+
+public class UserDatabaseHelper extends SQLiteOpenHelper {
+
+    private static final String DATABASE_NAME = "UserDB.db";
+    private static final int DATABASE_VERSION = 1;
+    private static final String TABLE_USERS = "users";
+
+    private static final String COLUMN_ID = "id";
+    private static final String COLUMN_USERNAME = "username";
+    private static final String COLUMN_EMAIL = "email";
+    private static final String COLUMN_PASSWORD = "password";
+    private static final String COLUMN_PHONE = "phone_number";
+
+    private static final String TABLE_INTERESTS = "user_interests";
+    private static final String COLUMN_USER = "username";
+    private static final String COLUMN_INTEREST = "interest";
+
+    public UserDatabaseHelper(Context context) {
+        super(context, DATABASE_NAME, null, DATABASE_VERSION);
+    }
+
+    @Override
+    public void onCreate(SQLiteDatabase db) {
+        String CREATE_USERS_TABLE = "CREATE TABLE " + TABLE_USERS + "("
+                + COLUMN_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
+                + COLUMN_USERNAME + " TEXT UNIQUE,"
+                + COLUMN_EMAIL + " TEXT,"
+                + COLUMN_PASSWORD + " TEXT,"
+                + COLUMN_PHONE + " TEXT"
+                + ")";
+        db.execSQL(CREATE_USERS_TABLE);
+
+        // NEW: interests table
+        String CREATE_INTERESTS_TABLE = "CREATE TABLE " + TABLE_INTERESTS + "("
+                + COLUMN_USER + " TEXT,"
+                + COLUMN_INTEREST + " TEXT"
+                + ")";
+        db.execSQL(CREATE_INTERESTS_TABLE);
+    }
+
+
+
+    @Override
+    public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+        db.execSQL("DROP TABLE IF EXISTS " + TABLE_USERS);
+        onCreate(db);
+    }
+
+    // Insert user
+    public boolean addUser(String username, String email, String password, String phone) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put(COLUMN_USERNAME, username);
+        values.put(COLUMN_EMAIL, email);
+        values.put(COLUMN_PASSWORD, password);
+        values.put(COLUMN_PHONE, phone);
+
+        long result = db.insert(TABLE_USERS, null, values);
+        db.close();
+        return result != -1;
+    }
+
+    // Check login
+    public boolean checkUser(String username, String password) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        String query = "SELECT * FROM " + TABLE_USERS +
+                " WHERE " + COLUMN_USERNAME + "=? AND " + COLUMN_PASSWORD + "=?";
+        Cursor cursor = db.rawQuery(query, new String[]{username, password});
+        boolean exists = cursor.getCount() > 0;
+        cursor.close();
+        db.close();
+        return exists;
+    }
+
+    // Check if user already exists (for Signup validation)
+    public boolean isUsernameTaken(String username) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        String query = "SELECT * FROM " + TABLE_USERS +
+                " WHERE " + COLUMN_USERNAME + "=?";
+        Cursor cursor = db.rawQuery(query, new String[]{username});
+        boolean taken = cursor.getCount() > 0;
+        cursor.close();
+        db.close();
+        return taken;
+    }
+
+    public void saveUserInterests(String username, Set<String> interests) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        db.delete(TABLE_INTERESTS, COLUMN_USER + "=?", new String[]{username}); // clear old
+
+        for (String interest : interests) {
+            ContentValues values = new ContentValues();
+            values.put(COLUMN_USER, username);
+            values.put(COLUMN_INTEREST, interest);
+            db.insert(TABLE_INTERESTS, null, values);
+        }
+        db.close();
+    }
+
+    public List<String> getUserInterests(String username) {
+        List<String> interests = new ArrayList<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+
+        Cursor cursor = db.query("user_interests",
+                new String[]{"interest"},
+                "username=?",
+                new String[]{username},
+                null, null, null);
+
+        if (cursor.moveToFirst()) {
+            do {
+                interests.add(cursor.getString(0));
+            } while (cursor.moveToNext());
+        }
+
+        cursor.close();
+        db.close();
+        return interests;
+    }
+}
+
+Historyfragment.java:
+package com.example.personalizedlearningexperienceapp;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.os.Bundle;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.Button;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class HistoryFragment extends Fragment {
+
+    private RecyclerView recyclerView;
+
+    public HistoryFragment() {
+        // Required empty public constructor
+    }
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
+        return inflater.inflate(R.layout.fragment_history, container, false);
+    }
+
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+
+        recyclerView = view.findViewById(R.id.historyRecyclerView);
+        recyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
+
+        List<QuizHistoryItem> historyList = new ArrayList<>();
+
+        // ✅ Load history from SQLite
+        SharedPreferences prefs = requireContext().getSharedPreferences("UserPrefs", Context.MODE_PRIVATE);
+        String username = prefs.getString("username", null);
+
+        if (username != null) {
+            UserDatabaseHelper dbHelper = new UserDatabaseHelper(requireContext());
+            List<String[]> rawHistory = dbHelper.getQuizHistory(username);
+
+            for (String[] item : rawHistory) {
+                String question = item[0];
+                String yourAnswer = item[1];
+                String correctAnswer = item[2];
+                String feedback;
+
+                if (yourAnswer.equals(correctAnswer)) {
+                    feedbaHistoryAdapterck = "✅ Correct!";
+                } else if (yourAnswer.equals("Not Answered")) {
+                    feedback = "⚠️ Not attempted.";
+                } else {
+                    feedback = "❌ Incorrect.";
+                }
+
+                historyList.add(new QuizHistoryItem(question, yourAnswer, correctAnswer, feedback));
+            }
+        }
+
+        HistoryAdapter adapter = new HistoryAdapter(historyList);
+        recyclerView.setAdapter(adapter);
+
+        // Back button click
+        Button btnBack = view.findViewById(R.id.btnBack);
+        btnBack.setOnClickListener(v -> requireActivity().getSupportFragmentManager().popBackStack());
+    }
+}
+
+
+HistoryAdapter:
+package com.example.personalizedlearningexperienceapp;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.os.Bundle;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.Button;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class HistoryFragment extends Fragment {
+
+    private RecyclerView recyclerView;
+
+    public HistoryFragment() {
+        // Required empty public constructor
+    }
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
+        return inflater.inflate(R.layout.fragment_history, container, false);
+    }
+
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+
+        recyclerView = view.findViewById(R.id.historyRecyclerView);
+        recyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
+
+        List<QuizHistoryItem> historyList = new ArrayList<>();
+
+        // ✅ Load history from SQLite
+        SharedPreferences prefs = requireContext().getSharedPreferences("UserPrefs", Context.MODE_PRIVATE);
+        String username = prefs.getString("username", null);
+
+        if (username != null) {
+            UserDatabaseHelper dbHelper = new UserDatabaseHelper(requireContext());
+            List<String[]> rawHistory = dbHelper.getQuizHistory(username);
+
+            for (String[] item : rawHistory) {
+                String question = item[0];
+                String yourAnswer = item[1];
+                String correctAnswer = item[2];
+                String feedback;
+
+                if (yourAnswer.equals(correctAnswer)) {
+                    feedback = "✅ Correct!";
+                } else if (yourAnswer.equals("Not Answered")) {
+                    feedback = "⚠️ Not attempted.";
+                } else {
+                    feedback = "❌ Incorrect.";
+                }
+
+                historyList.add(new QuizHistoryItem(question, yourAnswer, correctAnswer, feedback));
+            }
+        }
+
+        HistoryAdapter adapter = new HistoryAdapter(historyList);
+        recyclerView.setAdapter(adapter);
+
+        // Back button click
+        Button btnBack = view.findViewById(R.id.btnBack);
+        btnBack.setOnClickListener(v -> requireActivity().getSupportFragmentManager().popBackStack());
+    }
+}
+
+
+HomeFragment:
+package com.example.personalizedlearningexperienceapp;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.os.Bundle;
+import android.view.*;
+import android.widget.*;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
+import java.util.Random;
+
+
+import java.util.List;
+
+public class HomeFragment extends Fragment {
+
+    TextView greetingText, tvMyInterests;
+    Button btnSetInterest, btnLogout;
+
+    public HomeFragment() {}
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        View view = inflater.inflate(R.layout.fragment_home, container, false);
+
+        greetingText = view.findViewById(R.id.greetingText);
+        tvMyInterests = view.findViewById(R.id.tvMyInterests);
+        btnSetInterest = view.findViewById(R.id.btnSetInterest);
+        btnLogout = view.findViewById(R.id.btnLogout);
+        Button btnGenerateTaskArrow = view.findViewById(R.id.btnGenerateTaskArrow);
+        Button btnProfile = view.findViewById(R.id.btnProfile);
+        Button btnHistory = view.findViewById(R.id.btnHistory);
+        Button btnUpgrade = view.findViewById(R.id.btnUpgrade);
+
+        greetingText.setText("Hello, Student!");
+
+        SharedPreferences sharedPreferences = requireActivity().getSharedPreferences("UserPrefs", Context.MODE_PRIVATE);
+        String currentUsername = sharedPreferences.getString("username", null);
+
+        UserDatabaseHelper dbHelper = new UserDatabaseHelper(getContext());
+
+        if (currentUsername != null) {
+            List<String> interests = dbHelper.getUserInterests(currentUsername);
+            if (!interests.isEmpty()) {
+                StringBuilder sb = new StringBuilder("My Interests: ");
+                for (String interest : interests) {
+                    sb.append(interest).append(", ");
+                }
+                sb.setLength(sb.length() - 2); // remove trailing comma
+                tvMyInterests.setText(sb.toString());
+            } else {
+                tvMyInterests.setText("My Interests: None selected yet");
+            }
+        } else {
+            tvMyInterests.setText("My Interests: [User not found]");
+        }
+
+        btnGenerateTaskArrow.setOnClickListener(v -> {
+            SharedPreferences prefs = requireActivity().getSharedPreferences("UserPrefs", Context.MODE_PRIVATE);
+            String username = prefs.getString("username", null);
+
+            if (username != null) {
+                List<String> interests = dbHelper.getUserInterests(username);  // ✅ reuse existing dbHelper
+
+                if (!interests.isEmpty()) {
+                    String selectedTopic = interests.get(new Random().nextInt(interests.size()));
+
+                    // Pass the topic to QuizFragment
+                    Bundle bundle = new Bundle();
+                    bundle.putString("topic", selectedTopic);
+
+                    QuizFragment quizFragment = new QuizFragment();
+                    quizFragment.setArguments(bundle);
+
+                    getParentFragmentManager()
+                            .beginTransaction()
+                            .replace(R.id.fragment_container, quizFragment)
+                            .addToBackStack(null)
+                            .commit();
+                } else {
+                    Toast.makeText(getContext(), "No interests found!", Toast.LENGTH_SHORT).show();
+                }
+            } else {
+                Toast.makeText(getContext(), "User not logged in", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+
+        btnSetInterest.setOnClickListener(v -> {
+            getParentFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.fragment_container, new InterestFragment())
+                    .addToBackStack(null)
+                    .commit();
+        });
+
+
+
+        btnHistory.setOnClickListener(v -> {
+            requireActivity().getSupportFragmentManager().beginTransaction()
+                    .replace(R.id.fragment_container, new HistoryFragment())
+                    .addToBackStack(null)
+                    .commit();
+        });
+        btnProfile.setOnClickListener(v -> {
+            requireActivity().getSupportFragmentManager().beginTransaction()
+                    .replace(R.id.fragment_container, new ProfileFragment())
+                    .addToBackStack(null)
+                    .commit();
+        });
+
+
+        btnUpgrade.setOnClickListener(v -> {
+            requireActivity().getSupportFragmentManager().beginTransaction()
+                    .replace(R.id.fragment_container, new UpgradeFragment())
+                    .addToBackStack(null)
+                    .commit();
+        });
+
+
+        btnLogout.setOnClickListener(v -> {
+            getParentFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.fragment_container, new LoginFragment())
+                    .commit();
+        });
+
+        return view;
+    }
+}
+
+
+PaymentWebViewFragment:
+package com.example.personalizedlearningexperienceapp;
+
+import android.annotation.SuppressLint;
+import android.os.Bundle;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
+
+public class PaymentWebViewFragment extends Fragment {
+
+    private final String paymentUrl;
+
+    public PaymentWebViewFragment(String url) {
+        this.paymentUrl = url;
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
+        View view = inflater.inflate(R.layout.fragment_payment_webview, container, false);
+        WebView webView = view.findViewById(R.id.webPaymentView);
+
+        webView.getSettings().setJavaScriptEnabled(true);
+        webView.setWebViewClient(new WebViewClient());
+        webView.loadUrl(paymentUrl);
+
+        return view;
+    }
+}
+
+
+ProfileApiService
+package com.example.personalizedlearningexperienceapp;
+
+
+import retrofit2.Call;
+import retrofit2.http.Body;
+import retrofit2.http.POST;
+
+public interface ProfileApiService {
+    @POST("/api/profile")
+    Call<Void> uploadProfile(@Body ProfileData profile);
+}
+
+
+ProfileData:
+package com.example.personalizedlearningexperienceapp;
+
+public class ProfileData {
+    private String username;
+    private String email;
+    private int totalQuestions;
+    private int correctAnswers;
+    private int incorrectAnswers;
+
+    public ProfileData(String username, String email, int totalQuestions, int correctAnswers, int incorrectAnswers) {
+        this.username = username;
+        this.email = email;
+        this.totalQuestions = totalQuestions;
+        this.correctAnswers = correctAnswers;
+        this.incorrectAnswers = incorrectAnswers;
+    }
+
+    // (Optional) Add getters/setters if needed by Gson or for testing
+}
+
+
+ProfileFragment:
+package com.example.personalizedlearningexperienceapp;
+
+import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.graphics.Bitmap;
+import android.net.Uri;
+import android.os.Bundle;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.ImageButton;
+import android.widget.ImageView;
+import android.widget.TextView;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.core.content.FileProvider;
+import androidx.fragment.app.Fragment;
+
+import com.google.zxing.BarcodeFormat;
+import com.journeyapps.barcodescanner.BarcodeEncoder;
+
+import java.io.File;
+import java.io.FileOutputStream;
+
+public class ProfileFragment extends Fragment {
+
+    private TextView txtUsername, txtEmail, txtNotification;
+    private TextView txtTotalQuestions, txtCorrectAnswers, txtIncorrectAnswers;
+    private Button btnShare;
+    private ImageView qrImage;
+
+    public ProfileFragment() {}
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
+        return inflater.inflate(R.layout.fragment_profile, container, false);
+    }
+
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        // Bind UI elements
+        txtUsername = view.findViewById(R.id.txtUsername);
+        txtEmail = view.findViewById(R.id.txtEmail);
+        txtNotification = view.findViewById(R.id.txtNotification);
+        txtTotalQuestions = view.findViewById(R.id.txtTotalQuestions);
+        txtCorrectAnswers = view.findViewById(R.id.txtCorrectAnswers);
+        txtIncorrectAnswers = view.findViewById(R.id.txtIncorrectAnswers);
+        qrImage = view.findViewById(R.id.qrImage);
+        btnShare = view.findViewById(R.id.btnShare);
+        ImageButton btnBack = view.findViewById(R.id.btnBackProfile);
+
+        // Load username from SharedPreferences
+        SharedPreferences prefs = requireContext().getSharedPreferences("UserPrefs", Context.MODE_PRIVATE);
+        String username = prefs.getString("username", "Guest");
+
+        // Load user stats and email from database
+        UserDatabaseHelper dbHelper = new UserDatabaseHelper(requireContext());
+        String email = dbHelper.getEmailByUsername(username);
+        int[] stats = dbHelper.getQuizStats(username);
+
+        // Populate UI
+        txtUsername.setText(username);
+        txtEmail.setText(email != null ? email : "Not found");
+        txtNotification.setText("🔔 You're now a premium user!");
+        txtTotalQuestions.setText("📘\nTotal Questions\n" + stats[0]);
+        txtCorrectAnswers.setText("✅\nCorrectly Answered\n" + stats[1]);
+        txtIncorrectAnswers.setText("❌\nIncorrect Answers\n" + stats[2]);
+
+        // Generate shareable text
+        String shareText = username + " just answered " + stats[1] +
+                " out of " + stats[0] + " questions correctly! 💪\nTry it yourself!";
+
+        // Generate QR code from share text
+        Bitmap qrBitmap = null;
+        try {
+            BarcodeEncoder barcodeEncoder = new BarcodeEncoder();
+            qrBitmap = barcodeEncoder.encodeBitmap(shareText, BarcodeFormat.QR_CODE, 400, 400);
+            qrImage.setImageBitmap(qrBitmap);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        // Share QR code as image
+        Bitmap finalQrBitmap = qrBitmap;
+        btnShare.setOnClickListener(v -> {
+            if (finalQrBitmap != null) {
+                try {
+                    // Save QR image to cache
+                    File cachePath = new File(requireContext().getCacheDir(), "images");
+                    if (!cachePath.exists()) cachePath.mkdirs();
+                    File file = new File(cachePath, "qr_share.png");
+
+                    try (FileOutputStream stream = new FileOutputStream(file)) {
+                        finalQrBitmap.compress(Bitmap.CompressFormat.PNG, 100, stream);
+                    }
+
+                    Uri contentUri = FileProvider.getUriForFile(
+                            requireContext(),
+                            requireContext().getPackageName() + ".provider",
+                            file
+                    );
+
+                    // Share image intent
+                    Intent shareIntent = new Intent(Intent.ACTION_SEND);
+                    shareIntent.setType("image/png");
+                    shareIntent.putExtra(Intent.EXTRA_STREAM, contentUri);
+                    shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    startActivity(Intent.createChooser(shareIntent, "Share QR Code"));
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+
+        // Back button functionality
+        btnBack.setOnClickListener(v -> requireActivity().getSupportFragmentManager().popBackStack());
+    }
+}
+
+
+
+
+
+
+
+
+

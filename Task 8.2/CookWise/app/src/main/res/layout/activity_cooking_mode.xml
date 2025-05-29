@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:background="#000000"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="24dp">
+
+    <TextView
+        android:id="@+id/recipeFullText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Loading recipe..."
+        android:textColor="#FFD700"
+        android:textSize="16sp"
+        android:lineSpacingExtra="6dp"
+        android:fontFamily="sans-serif-medium"
+        android:background="#111111"
+        android:padding="100dp" />
+
+</ScrollView>
